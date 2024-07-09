@@ -1,0 +1,29 @@
+data_dir: "./data"
+train_class_file: configs/train_class.txt
+pretrained: true
+seed: 42
+batch_size: 128
+epochs: 2
+summary: False
+
+# Change optimizer and its config based on prefix, read docs if necessary
+optimizer: adam
+learning_rate: 0.1
+
+sgd_momentum: 0.9
+sgd_dampening: 0
+sgd_weight_decay: 0.1
+sgd_nesterov: 0
+
+adam_betas: [0.9, 0.999]
+adam_eps: 1.0e-8
+adam_weight_decay: 0
+adam_amsgrad: False
+
+adamw_betas: [0.9, 0.999]
+adamw_eps: 1.0e-8
+adamw_weight_decay: 0
+adamw_amsgrad: False
+
+lion_betas: [0.9, 0.99]
+lion_weight_decay: 0
