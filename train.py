@@ -157,7 +157,7 @@ if __name__ == '__main__':
         model.parameters(),
         lr=configs.learning_rate,
         **optim_cfg,
-                    )
+        )
     
     history = {
         'train_loss': [],
