@@ -69,7 +69,10 @@ def draw_log(history, expr_dir):
     plt.legend(loc="lower left")
     plt.savefig(Path(expr_dir)/'acc.jpg')
 
-def get_model(model_name:str, num_class:int, pretrained=True):
+def get_model(model_name:str,
+              num_class:int,
+              pretrained=True,
+              freeze_backbone: bool = False):
     models = {
         'vit_b_16': vit_b_16,
         'vit_l_16': vit_l_16,
@@ -84,6 +87,10 @@ def get_model(model_name:str, num_class:int, pretrained=True):
         model = models[model_name](weights='DEFAULT')
     else:
         model = models[model_name]()
+    if freeze_backbone:
+        for param in model.parameters():
+            param.requires_grad = False
+        
     if model_name.startswith('vit'):
         model.heads = nn.Linear(768, num_class)
     elif model_name.startswith('efficientnet'):
@@ -102,6 +109,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir',type=str)
     parser.add_argument('--pretrained',type=lambda x: bool(strtobool(x)))
+    parser.add_argument('--freeze_backbone',type=lambda x: bool(strtobool(x)))
     parser.add_argument('--optimizer',type=str)
     parser.add_argument('--batch_size',type=int)
     parser.add_argument('--seed',type=int)
@@ -162,7 +170,12 @@ if __name__ == '__main__':
     # Model
     model = get_model(configs.model_name,
                       len(train_dataset.train_class),
-                      configs.pretrained)
+                      configs.pretrained,
+                      configs.freeze_backbone)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f'Total number of parameters: {total_params:,}')
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'Total number of trainable parameters: {trainable_params:,}')
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
     model = model.to(device)
