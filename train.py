@@ -1,11 +1,15 @@
 import os
 import yaml
+import time
 import random
 import logging
 import argparse
+from tqdm import tqdm
 from pathlib import Path
+from distutils.util import strtobool
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 import torch
@@ -14,6 +18,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.models import (vit_b_16, vit_l_16, vit_b_32, vit_l_32, \
     efficientnet_b2)
+from torchinfo import summary
 
 from dataset import CatDataset
 
@@ -95,7 +100,14 @@ def seed_torch(seed=42):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    
+    parser.add_argument('--data_dir',type=str)
+    parser.add_argument('--pretrained',type=lambda x: bool(strtobool(x)))
+    parser.add_argument('--optimizer',type=str)
+    parser.add_argument('--batch_size',type=int)
+    parser.add_argument('--seed',type=int)
+    parser.add_argument('--epochs',type=int)
+    parser.add_argument('--learning_rate',type=float)
+    parser.add_argument('--summary',type=bool, default=False)
     args = parser.parse_args()
     # Experiment setup
     expr_dir = create_experiment()
@@ -119,10 +131,6 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Currently using {device}')
     # Data
-    # train_dataloader, val_dataloader = data_loader(configs.data_dir, \
-    #                                                 configs.batch_size,
-    #                                                 configs.seed,
-    #                                                 )
     img_transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -133,6 +141,7 @@ if __name__ == '__main__':
         ),
     ])
     train_dataset = CatDataset(configs.data_dir,
+                               configs.train_annot,
                                configs.train_class_file,
                                transform=img_transform)
     train_dataloader = DataLoader(train_dataset,
@@ -140,17 +149,21 @@ if __name__ == '__main__':
                                   shuffle=True,
                                   num_workers=configs.num_workers)
     val_dataset = CatDataset(configs.data_dir,
-                              configs.test_class_file,
-                              transform=img_transform)
+                             configs.test_annot,
+                             configs.train_class_file,
+                             transform=img_transform)
     val_dataloader = DataLoader(val_dataset,
-                                 test=configs.batch_size,
+                                 batch_size=configs.batch_size,
                                  shuffle=False,
                                  num_workers=configs.num_workers)
     train_steps = len(train_dataloader.dataset) // configs.batch_size
     val_steps = len(val_dataloader.dataset) // configs.batch_size
     logging.info(f'Train step:{train_steps}, Val steps:{val_steps}')
     # Model
-    model = get_model(configs.pretrained, device)
+    model = get_model(configs.model_name,
+                      len(train_dataset.train_class),
+                      configs.pretrained)
+    model = model.to(device)
     logging.info(f'Use pretrained model: {configs.pretrained}')
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(
@@ -166,5 +179,61 @@ if __name__ == '__main__':
         'val_acc': [],
     }
     
-    model = get_model('efficientnet_b2')
-    print(model)
+    if configs.summary:
+        logging.info(summary(model,input_size=(configs.batch_size,3,28,28)))
+    start_time = time.time()
+    for epoch in range(configs.epochs):
+        model.train()
+        total_train_loss = 0
+        total_val_loss = 0
+
+        train_correct = 0
+        val_correct = 0
+
+        for images, labels in tqdm(train_dataloader):
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_train_loss +=  loss.detach()
+            train_correct += (outputs.argmax(1) == labels).type(torch.float).sum().item()
+
+        model.eval()
+        with torch.no_grad():
+            correct, total = 0, 0
+            for images, labels in tqdm(val_dataloader):
+                images = images.repeat(1,3,1,1)
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                total_val_loss += criterion(outputs, labels)
+                val_correct += (outputs.argmax(1) == labels).type(torch.float).sum().item()
+
+        avg_train_loss = total_train_loss / train_steps
+        avg_val_loss = total_val_loss / val_steps
+
+        train_correct = train_correct / len(train_dataloader.dataset)
+        val_correct = val_correct / len(val_dataloader.dataset)
+
+        history['train_loss'].append(avg_train_loss.cpu().detach().numpy())
+        history['train_acc'].append(train_correct)
+        history['val_loss'].append(avg_val_loss.cpu().detach().numpy())
+        history['val_acc'].append(val_correct)
+
+        logging.info('[INFO] EPOCHS: {}/{}'.format(epoch + 1, configs.epochs))
+        logging.info('Train loss {:.6f}, Train accuracy: {:.4f}'.format(avg_train_loss, train_correct))
+        logging.info('Val loss: {:.6f}, Val accuracy: {:.4f}\n'.format(avg_val_loss, val_correct))
+    end_time = time.time()
+    logging.info('[INFO] total time taken to train the model: {:.2f}s'.format(end_time - start_time))
+    
+    draw_log(history, expr_dir)
+    df = pd.DataFrame.from_dict(history)
+    df.rename(columns={df.columns[0]:'ID'}).to_csv(Path(expr_dir)/'history.csv')
+    torch.save(model.state_dict(), Path(expr_dir)/'model.pt')
+    with open(Path(expr_dir)/'configs.yaml', 'w') as file:
+        for key, val in vars(configs).items():
+            file.write(f'{key}: {val}\n')

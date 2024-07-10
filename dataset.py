@@ -13,19 +13,22 @@ from torch import nn
 class CatDataset(Dataset):
     def __init__(self,
                  root_dir: str,
+                 annot_file: str,
                  train_class_file: str,
                  transform):
         super().__init__()
-        self.root_dir = root_dir
+        self.root_dir = Path(root_dir)
         with open(train_class_file, 'r') as f:
             train_class = f.readlines()
         self.train_class = [tc.strip() for tc in train_class]
-        self.class2idx = {clss: i for i, clss in enumerate(train_class)}
-        self.idx2class = {i: clss for i, clss in enumerate(train_class)}
-        img_dirs = list(Path(root_dir).rglob('**/*.*g'))
+        self.class2idx = {clss: i for i, clss in enumerate(self.train_class)}
+        self.idx2class = {i: clss for i, clss in enumerate(self.train_class)}
+        with open(annot_file, 'r') as f:
+            annot = f.readlines()
         self.data = []
         print('Read data')
-        for img_dir in tqdm(img_dirs):
+        for ann in tqdm(annot):
+            img_dir = self.root_dir / ann.strip()
             img_class = img_dir.parts[-2]
             if img_class in self.train_class:
                 self.data.append({

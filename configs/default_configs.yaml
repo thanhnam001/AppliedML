@@ -1,10 +1,18 @@
-data_dir: "./data"
+# Data
+data_dir: "./data/images"
 train_class_file: configs/train_class.txt
+train_annot: configs/train.txt
+test_annot: configs/test.txt
+
+# Model
+model_name: vit_b_16
 pretrained: true
+# Train configs
 seed: 42
-batch_size: 128
+batch_size: 16
 epochs: 2
 summary: False
+num_workers: 0
 
 # Change optimizer and its config based on prefix, read docs if necessary
 optimizer: adam
