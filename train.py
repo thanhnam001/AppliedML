@@ -222,7 +222,6 @@ if __name__ == '__main__':
         with torch.no_grad():
             correct, total = 0, 0
             for images, labels in tqdm(val_dataloader):
-                images = images.repeat(1,3,1,1)
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
                 total_val_loss += criterion(outputs, labels)
