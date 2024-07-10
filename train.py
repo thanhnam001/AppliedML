@@ -163,6 +163,8 @@ if __name__ == '__main__':
     model = get_model(configs.model_name,
                       len(train_dataset.train_class),
                       configs.pretrained)
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
     model = model.to(device)
     logging.info(f'Use pretrained model: {configs.pretrained}')
     criterion = nn.CrossEntropyLoss()
