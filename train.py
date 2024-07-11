@@ -1,4 +1,5 @@
 import os
+import sys
 import yaml
 import time
 import random
@@ -124,7 +125,7 @@ if __name__ == '__main__':
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler(Path(expr_dir)/"experiment.log"),
-            logging.StreamHandler()
+            logging.StreamHandler(stream=sys.stdout)
         ]
     )
     # Configs
@@ -141,7 +142,9 @@ if __name__ == '__main__':
     # Data
     img_transform = transforms.Compose([
         transforms.Resize(256),
-        transforms.CenterCrop(224),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(10),  # Rotate images by 10 degrees
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -166,7 +169,9 @@ if __name__ == '__main__':
                                  num_workers=configs.num_workers)
     train_steps = len(train_dataloader.dataset) // configs.batch_size
     val_steps = len(val_dataloader.dataset) // configs.batch_size
-    logging.info(f'Train step:{train_steps}, Val steps:{val_steps}')
+    logging.info(f'Train step: {train_steps}, Val steps: {val_steps}')
+    logging.info(f'Train data summary {train_dataset.summary()}')
+    logging.info(f'Val data summary {val_dataset.summary()}')
     # Model
     model = get_model(configs.model_name,
                       len(train_dataset.train_class),
@@ -186,7 +191,6 @@ if __name__ == '__main__':
         lr=configs.learning_rate,
         **optim_cfg,
         )
-    
     history = {
         'train_loss': [],
         'train_acc': [],

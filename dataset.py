@@ -1,7 +1,9 @@
+import json
 import argparse
+import os
 from tqdm import tqdm
 from pathlib import Path
-from collections import defaultdict
+from collections import defaultdict, Counter
 from PIL import Image
 
 from sklearn.model_selection import train_test_split
@@ -51,6 +53,9 @@ class CatDataset(Dataset):
         lb = torch.tensor(lb)
         return img_ts, lb
     
+    def summary(self):
+        return Counter([d['class'] for d in self.data])
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
                     prog='Create ',
@@ -64,7 +69,7 @@ if __name__ == '__main__':
                         default='configs')
     parser.add_argument('--num_class',
                         type=int,
-                        default=10,
+                        default=0,
                         help='Number of most appeared classes use to train')
     args = parser.parse_args()
     save_dir = Path(args.save_dir)
@@ -80,14 +85,24 @@ if __name__ == '__main__':
     class_count = dict(class_count)
     sorted_class_count = sorted(class_count.items(), key=lambda x:x[1], reverse=True)
     
-    num_class = args.num_class
-    print('Num classes use to train', num_class)
-    print('Save at', save_dir / 'train_class.txt')
-    with open(save_dir/ 'train_class.txt','w') as f:
-        f.write('\n'.join([x[0] for x in sorted_class_count[:num_class]]))
+    with open(save_dir/'class_count.json','w') as f:
+        json.dump(dict(sorted_class_count), f, indent=4)
+    
+    if args.num_class > 0:
+        num_class = args.num_class
+        print('Num classes use to train', num_class)
+        print('Save at', save_dir / 'train_class.txt')
+        to_train_classes = [x[0] for x in sorted_class_count[:num_class]]
+        with open(save_dir/ 'train_class.txt','w') as f:
+            f.write('\n'.join(to_train_classes))
+    elif os.path.exists(save_dir/'train_class.txt'):
+        print(f'Num class not provided, use {save_dir}/train_class.txt')
+        with open(save_dir/'train_class.txt','r') as f:
+            clss_f = f.readlines()
+        to_train_classes = [clss.strip() for clss in clss_f]
         
     use_img_dirs, labels = [], []
-    for clss, _ in sorted_class_count[:num_class]:
+    for clss in to_train_classes:
         tmp_img_dirs = [str(imd).replace('\\','/').replace(args.img_dir,'').lstrip('/') for imd in class_imgs[clss]]
         use_img_dirs += tmp_img_dirs
         labels += [clss] * len(class_imgs[clss])
