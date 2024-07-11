@@ -1,10 +1,6 @@
-Domestic Short Hair
-Domestic Medium Hair
-American Shorthair
 Domestic Long Hair
 Persian
 Tortoiseshell
 Calico
 Torbie
-Dilute Calico
 Tuxedo
