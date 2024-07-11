@@ -99,11 +99,11 @@ def get_model(model_name:str,
             param.requires_grad = False
         
     if model_name.startswith('vit'):
-        model.heads.head.out_features = num_class
+        model.heads.head = nn.Linear(model.heads.head.in_features, num_class)
     elif model_name.startswith('efficientnet'):
-        model.classifier[1].out_features = num_class
+        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_class)
     else: # resnet
-        model.fc.out_features = num_class
+        model.fc = nn.Linear(model.fc.in_features, num_class)
     return model
     
 def seed_torch(seed=42):
