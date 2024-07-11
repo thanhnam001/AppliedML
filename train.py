@@ -18,7 +18,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.models import (vit_b_16, vit_l_16, vit_b_32, vit_l_32, \
-    efficientnet_b2)
+    efficientnet_b0, efficientnet_b1, efficientnet_b2, \
+    resnet18, resnet34, resnet50)
 from torchinfo import summary
 
 from dataset import CatDataset
@@ -79,7 +80,12 @@ def get_model(model_name:str,
         'vit_l_16': vit_l_16,
         'vit_b_32': vit_b_32,
         'vit_l_32': vit_l_32,
+        'efficientnet_b0': efficientnet_b0,
+        'efficientnet_b1': efficientnet_b1,
         'efficientnet_b2': efficientnet_b2,
+        'resnet18': resnet18,
+        'resnet34': resnet34,
+        'resnet50': resnet50
     }
     if model_name not in models.keys():
         print('Invalid model name',model_name)
@@ -93,9 +99,11 @@ def get_model(model_name:str,
             param.requires_grad = False
         
     if model_name.startswith('vit'):
-        model.heads = nn.Linear(768, num_class)
+        model.heads.head.out_features = num_class
     elif model_name.startswith('efficientnet'):
-        model.classifier[1] = torch.nn.Linear(1408, num_class)
+        model.classifier[1].out_features = num_class
+    else: # resnet
+        model.fc.out_features = num_class
     return model
     
 def seed_torch(seed=42):
