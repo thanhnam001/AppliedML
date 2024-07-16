@@ -17,6 +17,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
 from torchvision.models import (vit_b_16, vit_l_16, vit_b_32, vit_l_32, \
     efficientnet_b0, efficientnet_b1, efficientnet_b2, \
     resnet18, resnet34, resnet50)
@@ -119,6 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir',type=str)
     parser.add_argument('--pretrained',type=lambda x: bool(strtobool(x)))
     parser.add_argument('--freeze_backbone',type=lambda x: bool(strtobool(x)))
+    parser.add_argument('--unfreeze_after',type=int)
     parser.add_argument('--optimizer',type=str)
     parser.add_argument('--batch_size',type=int)
     parser.add_argument('--seed',type=int)
@@ -194,12 +196,15 @@ if __name__ == '__main__':
     model = model.to(device)
     logging.info(f'Use pretrained model: {configs.pretrained}')
     criterion = nn.CrossEntropyLoss()
+    
     trainable_params = [param for param in model.parameters() if param.requires_grad]
     optimizer = torch.optim.AdamW(
         trainable_params,
         lr=configs.learning_rate,
         **optim_cfg,
         )
+    scheduler = OneCycleLR(optimizer, max_lr=configs.learning_rate, 
+                       steps_per_epoch=len(train_dataloader), epochs=configs.epochs)
     history = {
         'train_loss': [],
         'train_acc': [],
@@ -208,7 +213,7 @@ if __name__ == '__main__':
     }
     
     if configs.summary:
-        logging.info(summary(model,input_size=(configs.batch_size,3,28,28)))
+        logging.info(summary(model,input_size=(configs.batch_size,3,224,224)))
     start_time = time.time()
     for epoch in range(configs.epochs):
         model.train()
@@ -228,6 +233,8 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()
+            
             total_train_loss +=  loss.detach()
             train_correct += (outputs.argmax(1) == labels).type(torch.float).sum().item()
 
@@ -240,6 +247,14 @@ if __name__ == '__main__':
                 total_val_loss += criterion(outputs, labels)
                 val_correct += (outputs.argmax(1) == labels).type(torch.float).sum().item()
 
+        if (epoch + 1) == configs.unfreeze_after:
+            for param in model.backbone.parameters():
+                param.requires_grad = True
+            optimizer = torch.optim.AdamW(model.parameters(), lr=configs.learning_rate, **optim_cfg)
+            # Tạo lại scheduler cho optimizer mới
+            scheduler = OneCycleLR(optimizer, max_lr=configs.learning_rate, 
+                                steps_per_epoch=len(train_dataloader), epochs=(configs.epochs - configs.unfreeze_after))
+        
         avg_train_loss = total_train_loss / train_steps
         avg_val_loss = total_val_loss / val_steps
 
