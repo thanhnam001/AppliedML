@@ -1,20 +1,21 @@
 # Data
-data_dir: "./data/images"
+data_dir: './data/images'
 train_class_file: configs/train_class.txt # classes want to train
 train_annot: configs/train.txt
 test_annot: configs/test.txt
 
 # Model
-model_name: vit_b_16
+model_name: vit_b_32
 pretrained: true
-freeze_backbone: false
+freeze_backbone: true
 
 # Train configs
 seed: 42
 batch_size: 16
-epochs: 2
+epochs: 50
 summary: False
 num_workers: 0
+unfreeze_after: 20
 
 # Change optimizer and its config based on prefix, read docs if necessary
 optimizer: adam
