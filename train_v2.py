@@ -248,7 +248,7 @@ if __name__ == '__main__':
                 val_correct += (outputs.argmax(1) == labels).type(torch.float).sum().item()
 
         if (epoch + 1) == configs.unfreeze_after:
-            for param in model.backbone.parameters():
+            for param in model.parameters():
                 param.requires_grad = True
             optimizer = torch.optim.AdamW(model.parameters(), lr=configs.learning_rate, **optim_cfg)
             # Tạo lại scheduler cho optimizer mới
